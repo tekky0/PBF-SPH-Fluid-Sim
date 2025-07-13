@@ -9,25 +9,24 @@
 #define grid_Y 16
 
 //particle class
-#define MAX_NUM_PARTICLES 200
+#define MAX_NUM_PARTICLES 150
 #define stride 5
 //x,y,u,v,l
 //note that particles ids are in their respective index
 
 //world definitions
 #define spawn_spacing 1.0f
-#define dt 0.0167f
+#define dt 1.0f/128.0f
 #define grav_X 0.0f
 #define grav_Y -9.81f
-#define range 2.0f
+#define range 1.5f
 #define kappa 0.1f
 #define pie 3.14f
-//pressure correction takes range*-0.2
-#define radius 0.2f
-#define e 0.0001f
 #define rho0 12.0f
-//bear in mind 'range' is the radius of the kernel functions detection range
+//pressure correction takes range*-0.2
+#define e 1.0E-10f
 
+//bear in mind 'range' is the radius of the kernel functions detection range
 float* particles = NULL;
 float* neighbor_p = NULL;
 int* neighbor_prefix = NULL;
@@ -56,7 +55,6 @@ void integrate_particles(int p_num) {
         for (int j = 0; j < grid_X && count < p_num; j++) {
             particles[count * stride] = x; // x position
             particles[count * stride + 1] = y; // y position
-            // u, v, c, p, f, s left at 0
             count++;
             x += spawn_spacing;
         }
@@ -157,7 +155,7 @@ void mov_correct() {
             weightsum += weight;
             gradientsum += dot;
         }
-        particles[i * stride + 4] = -((weightsum / rho0 - 1.0f) / (gradientsum + e));
+        particles[i * stride + 4] = -((power(weightsum / rho0, 7) - 1.0f) / (gradientsum + e));
     }
 }
 
@@ -172,11 +170,12 @@ void position_change() {
         for (; start < end; start++) {
             int k = neighbor_names[start];
             if (k == i) continue;
-            float p_corr = -kappa*power(neighbor_p[start * n_stride] / .1f*range, 7);
+            //particle[i*stride+2] += particle[i * stride + 2]- particle[j * stride + 2]
+            float p_corr = -kappa*power(neighbor_p[k * n_stride] / 0.1f*range, 7);
             float lambda_j = particles[k * stride + 4];
             float scale_coeff = lambda_i + lambda_j + p_corr;
-            lx += neighbor_p[start * n_stride + 2] * scale_coeff;
-            ly += neighbor_p[start * n_stride + 3] * scale_coeff;
+            lx += neighbor_p[k * n_stride + 2] * scale_coeff;
+            ly += neighbor_p[k * n_stride + 3] * scale_coeff;
 
         }
 
@@ -185,8 +184,12 @@ void position_change() {
     }
 }
 
+void viscousity() {
+
+}
+
 void boundary_check() {
-    const float bounce_damping = .2f;  // adjust to control how strong the bounce is
+    const float bounce_damping = .4f;  // adjust to control how strong the bounce is
 
     for (int i = 0; i < MAX_NUM_PARTICLES; i++) {
         int pi = i * stride;
@@ -195,21 +198,21 @@ void boundary_check() {
 
         // Check X boundaries
         if (x < 0.0f) {
-            particles[pi] = 0.0f;
+            particles[pi] = 0.1f;
             particles[pi + 2] *= -bounce_damping;  // reverse and dampen X velocity
         }
         else if (x > grid_X) {
-            particles[pi] = grid_X;
+            particles[pi] = grid_X-0.1f;
             particles[pi + 2] *= -bounce_damping;
         }
 
         // Check Y boundaries
         if (y < 0.0f) {
-            particles[pi + 1] = 0.0f;
+            particles[pi + 1] = 0.1f;
             particles[pi + 3] *= -bounce_damping;  // reverse and dampen Y velocity
         }
         else if (y > grid_Y) {
-            particles[pi + 1] = grid_Y;
+            particles[pi + 1] = grid_Y-0.1f;
             particles[pi + 3] *= -bounce_damping;
         }
     }
@@ -236,18 +239,16 @@ void main() {
     int framef = 0;
         clock_t start = clock();
     while (!glfwWindowShouldClose(window)) {
+        clock_t frame_start = clock();
         printf("frames: %d\n", framef++);
         glClear(GL_COLOR_BUFFER_BIT);
         // Simulate particles
         apply_force();
         set_p_neighbor();
-
         mov_correct();
         position_change();
         timestep();
-        boundary_check();
-        (particles[1] > 50.0f) ? printf("Particle 0: x=%.2f y=%.2f\n", particles[0], particles[1]) : printf("");
-        
+        boundary_check();        
         
         glClear(GL_COLOR_BUFFER_BIT);
         glLoadIdentity();
@@ -266,6 +267,9 @@ void main() {
 
         glfwSwapBuffers(window);
         glfwPollEvents();
+        clock_t frame_end = clock();
+        double frame_lapse = (double)(frame_end-frame_start) / CLOCKS_PER_SEC;
+        printf("took %f for frame %d\n", frame_lapse, framef-1);
     }
 
         clock_t end = clock();
