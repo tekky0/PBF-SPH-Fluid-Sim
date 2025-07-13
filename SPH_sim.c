@@ -5,8 +5,8 @@
 #include <time.h>
 #include <GLFW\glfw3.h>
 
-#define grid_X 20
-#define grid_Y 20
+#define grid_X 16
+#define grid_Y 16
 
 //particle class
 #define MAX_NUM_PARTICLES 200
@@ -18,9 +18,10 @@
 #define spawn_spacing 1.0f
 #define dt 0.0167f
 #define grav_X 0.0f
-#define grav_Y -0.2f
-#define range 1.5f
+#define grav_Y -9.81f
+#define range 2.0f
 #define kappa 0.1f
+#define pie 3.14f
 //pressure correction takes range*-0.2
 #define radius 0.2f
 #define e 0.0001f
@@ -116,7 +117,7 @@ void set_p_neighbor() {
 
                 if (abs > 0.0f && abs < range) {
                     neighbor_names[name_index++] = j;
-                    float weight = 1.0f - (abs / range);
+                    float weight = 315.0f * power(abs,3) / (64.0f* pie * power(range, 9));
                     neighbor_p[index++] = weight;        // kernel weight
                     neighbor_p[index++] = dot;
                     neighbor_p[index++] = dx;
@@ -171,7 +172,7 @@ void position_change() {
         for (; start < end; start++) {
             int k = neighbor_names[start];
             if (k == i) continue;
-            float p_corr = -kappa*power(neighbor_p[start * n_stride] / .1f*range, 12);
+            float p_corr = -kappa*power(neighbor_p[start * n_stride] / .1f*range, 7);
             float lambda_j = particles[k * stride + 4];
             float scale_coeff = lambda_i + lambda_j + p_corr;
             lx += neighbor_p[start * n_stride + 2] * scale_coeff;
