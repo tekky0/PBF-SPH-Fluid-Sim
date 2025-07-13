@@ -37,7 +37,7 @@ int* neighbor_names = NULL;
 
 float power(float target, int value) {
     float ref = target;
-    for (int i = value; i < value; i++) {
+    for (int i = 0; i < value; i++) {
         ref *= target;
     }
     return ref;
